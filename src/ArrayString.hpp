@@ -6,15 +6,15 @@ template <size_t _MaxLen, typename _T>
 class BasicArrayString
 {
 public:
-	static constexpr size_t max_length = _MaxLen;
+	static constexpr size_t max_str_length = _MaxLen;
 
 	typedef _T value_type;
 	typedef _T char_type;
 	typedef std::basic_string<value_type> string_type;
 	typedef typename string_type::traits_type traits_type;
 
-	constexpr void _copy(char_type *dst, const char_type *src, size_t length = max_length);
-	constexpr size_t _length(const char_type *src, size_t max_length = max_length);
+	constexpr void _copy(char_type *dst, const char_type *src, size_t length = max_str_length);
+	constexpr size_t _length(const char_type *src, size_t max_length = max_str_length);
 
 	constexpr BasicArrayString() = default;
 
@@ -23,7 +23,7 @@ public:
 	}
 
 	constexpr BasicArrayString(const char_type *cstr, const size_t length)
-		: m_length{std::min(max_length, length)} {
+		: m_length{std::min(max_str_length, length)} {
 		(void)_copy(m_data, cstr, m_length);
 		m_data[m_length] = char_type();
 	}
@@ -44,7 +44,7 @@ public:
 	}
 
 	constexpr explicit BasicArrayString(const size_t count, const char_type _char)
-		: m_length{std::min(max_length, count)} {
+		: m_length{std::min(max_str_length, count)} {
 		// filling the string with null chars
 		if (_char == char_type())
 		{
@@ -63,9 +63,9 @@ public:
 
 	template <size_t N>
 	constexpr BasicArrayString(const char_type(&_arr)[N])
-		: m_length{std::min(max_length, N)} {
+		: m_length{std::min(max_str_length, N)} {
 		// filling the string with null chars
-		for (size_t i = 0; i < std::min(max_length, N); i++)
+		for (size_t i = 0; i < std::min(max_str_length, N); i++)
 		{
 			if (_arr[i] == char_type())
 			{
@@ -77,10 +77,6 @@ public:
 		}
 
 		m_data[m_length] = char_type();
-	}
-
-	constexpr BasicArrayString(const char_type *cstr)
-		: BasicArrayString(cstr, _length(cstr)) {
 	}
 
 	constexpr BasicArrayString(const string_type &str)
@@ -146,7 +142,7 @@ public:
 
 private:
 	size_t m_length = 0;
-	char_type m_data[max_length + 1] = {0};
+	char_type m_data[max_str_length + 1] = {0};
 };
 
 template <size_t MaxLen>

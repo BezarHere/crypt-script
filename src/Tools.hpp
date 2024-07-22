@@ -14,11 +14,6 @@ namespace tools
 			}
 		}
 
-		return 0;
-	}
-
-	template <typename T, typename _Pred>
-	static constexpr size_t count(T begin, T end, _Pred &&pred) {
-		return count(begin, std::distance(begin, end), pred);
+		return max_count;
 	}
 }

@@ -20,8 +20,6 @@ enum class TokenType : uint8_t
 	Integer,
 	Real,
 
-	AssignOp,
-
 	AddOp,
 	SubOp,
 	MulOp,
@@ -32,8 +30,22 @@ enum class TokenType : uint8_t
 	MulEqOp,
 	DivEqOp,
 
+	AssignOp,
 	EqualityOp,
+
+	NotOp,
 	InEqualityOp,
+
+	AndOp,
+	OrOp,
+
+	BitAndOp,
+	BitOrOp,
+	BitNotOp,
+
+	BitAndEqOp,
+	BitOrEqOp,
+	BitNotEqOp,
 
 	ParenthesisOpen,
 	ParenthesisClose,

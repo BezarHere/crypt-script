@@ -2,6 +2,8 @@
 #include "Tools.hpp"
 #include "ArrayString.hpp"
 
+#include <iostream>
+#include <limits>
 
 static inline bool IsNewline(CryptChar value);
 static inline bool IsWhiteSpaceNonNewline(CryptChar value);
@@ -10,6 +12,9 @@ static inline bool IsDigit(CryptChar value);
 static inline bool IsAlpha(CryptChar value);
 static inline bool IsAlphaOrDigit(CryptChar value);
 static inline bool IsPrintable(CryptChar value);
+
+static inline bool IsIdentifierStart(CryptChar value);
+static inline bool IsIdentifier(CryptChar value);
 
 class Tokenizer
 {
@@ -21,29 +26,34 @@ public:
 	inline size_t get_source_length() const { return m_source_length; }
 	inline const CryptChar *get_source() const { return m_source; }
 
-	errno_t _parse_token();
-	Token _read_token();
-
-	template <typename Pred>
-	Token _read_continues(TokenType type, TextPosition pos, Pred &&predicate);
-
-	void _add_token(const Token &token);
-
 	inline const CryptChar *get_current_string() const { return &m_source[m_position]; }
 	inline size_t get_space_left() const { return m_source_length - m_position; }
 
 	inline bool empty_read() const { return m_position >= m_source_length; }
 
-	void advance(int offset = 1);
+	inline size_t get_read_position() const { return m_position; }
 
 	std::vector<Token> storage;
 private:
+	void _advance(offset_t offset = 1);
+
+	errno_t _parse_token();
+	Token _read_token();
+
+	Token _read_number();
+	template <typename Pred>
+	Token _read_continues(TokenType type, Pred &&predicate);
+
+	void _add_token(const Token &token);
+
+private:
 	size_t m_position = 0;
 
-	TextPosition m_text_pos = {0, 0};
+	size_t m_lines_read = 0;
+	size_t m_last_line_pos = 0;
 
-	const size_t m_source_length;
 	const CryptChar *m_source;
+	const size_t m_source_length;
 };
 
 void Token::Parse(const CryptChar *source, size_t length, std::vector<Token> &out_tokens) {
@@ -79,7 +89,10 @@ void Tokenizer::parse() {
 }
 
 errno_t Tokenizer::_parse_token() {
+	const size_t pre_read_pos = get_read_position();
 	Token token = this->_read_token();
+	token.pos.line = m_lines_read;
+	token.pos.column = pre_read_pos - m_last_line_pos;
 
 	if (token.type == TokenType::EndOfFile)
 	{
@@ -89,6 +102,12 @@ errno_t Tokenizer::_parse_token() {
 	if (token.content_length == 0)
 	{
 		return EBADF;
+	}
+
+	if (token.type == TokenType::Newline)
+	{
+		m_last_line_pos = get_read_position();
+		m_lines_read += token.content_length;
 	}
 
 	this->storage.push_back(token);
@@ -102,12 +121,16 @@ Token Tokenizer::_read_token() {
 	}
 
 	const CryptChar current_char = *get_current_string();
+	const size_t space_left = get_space_left();
+
+	std::cout << "current char: " << current_char << '\n';
+
+	//* whitespace and newlines
 
 	if (IsNewline(current_char))
 	{
 		return _read_continues(
 			TokenType::Newline,
-			m_text_pos,
 			IsNewline
 		);
 	}
@@ -116,10 +139,11 @@ Token Tokenizer::_read_token() {
 	{
 		return _read_continues(
 			TokenType::Whitespace,
-			m_text_pos,
 			IsWhiteSpaceNonNewline
 		);
 	}
+
+	//* basic symbols
 
 	constexpr std::pair<CryptChar, TokenType> SimpleCharTokenMap[] = {
 		{ ',', TokenType::Comma },
@@ -138,22 +162,111 @@ Token Tokenizer::_read_token() {
 			token.type = SimpleCharTokenMap[i].second;
 			token.content = get_current_string();
 			token.content_length = 1;
-			token.pos = m_text_pos;
 
-			this->advance();
+			this->_advance();
 
 			return token;
 		}
 	}
 
-	return {TokenType::Unknown, get_current_string(), 1, m_text_pos};
+	//* numbers (floats and integers)
+
+	if (space_left > 1)
+	{
+		if (current_char == '-' && IsDigit(get_current_string()[1]))
+		{
+			return _read_number();
+		}
+	}
+
+	if (IsDigit(current_char))
+	{
+		return _read_number();
+	}
+
+	//* operators
+
+	struct OperatorMatch
+	{
+		CryptChar character;
+		TokenType type;
+		// set to unknow to mark a non-combined operator
+		TokenType comp_type = TokenType::Unknown;
+		CryptChar comp_char = '=';
+	};
+
+	constexpr OperatorMatch Operators[] = {
+		{ '+', TokenType::AddOp, TokenType::AddEqOp },
+		{ '-', TokenType::SubOp, TokenType::SubEqOp },
+		{ '*', TokenType::MulOp, TokenType::MulEqOp },
+		{ '/', TokenType::DivOp, TokenType::DivEqOp },
+
+		{ '=', TokenType::AssignOp, TokenType::EqualityOp },
+		{ '!', TokenType::NotOp, TokenType::InEqualityOp },
+
+		// logic operators can only be compound ('&&' and '||') 
+		{ '&', TokenType::Unknown, TokenType::AndOp, '&' },
+		{ '|', TokenType::Unknown, TokenType::OrOp, '|' },
+
+		// make sure the bit and/or ops come after the logic ops to not shadow them 
+		{ '&', TokenType::BitAndOp, TokenType::BitAndEqOp },
+		{ '|', TokenType::BitOrOp, TokenType::BitOrEqOp },
+		{ '~', TokenType::BitNotOp, TokenType::BitNotEqOp },
+	};
+
+	for (size_t i = 0; i < std::size(Operators); i++)
+	{
+		const auto &current_op = Operators[i];
+
+		if (current_char != current_op.character)
+		{
+			continue;
+		}
+
+		if (current_op.comp_type != TokenType::Unknown && space_left > 1)
+		{
+			if (get_current_string()[1] == current_op.comp_char)
+			{
+				Token token;
+				token.type = current_op.comp_type;
+				token.content = get_current_string();
+				token.content_length = 2;
+				return token;
+			}
+		}
+
+		if (current_op.type == TokenType::Unknown)
+		{
+			continue;
+		}
+
+		Token token;
+		token.type = current_op.type;
+		token.content = get_current_string();
+		token.content_length = 1;
+		return token;
+	}
+
+	if (IsIdentifierStart(current_char))
+	{
+		return _read_continues(
+			TokenType::Identifier,
+			IsIdentifier
+		);
+	}
+
+	return {TokenType::Unknown, get_current_string(), 1};
+}
+
+Token Tokenizer::_read_number() {
+	return Token();
 }
 
 void Tokenizer::_add_token(const Token &token) {
 	storage.push_back(token);
 }
 
-void Tokenizer::advance(int offset) {
+void Tokenizer::_advance(offset_t offset) {
 	if (-offset > m_position)
 	{
 		m_position = 0;
@@ -170,17 +283,23 @@ void Tokenizer::advance(int offset) {
 }
 
 template<typename Pred>
-Token Tokenizer::_read_continues(TokenType type, TextPosition pos, Pred &&predicate) {
+Token Tokenizer::_read_continues(TokenType type, Pred &&predicate) {
 	size_t count = tools::count(get_current_string(), get_space_left(), predicate);
-	Token tk;
-	tk.content = get_current_string();
-	tk.content_length = count;
-	tk.type = type;
-	tk.pos = pos;
+	if (count >= std::numeric_limits<offset_t>::max())
+	{
+		throw std::out_of_range("count");
+	}
 
-	advance(count);
+	std::cout << count << '\n';
 
-	return tk;
+	Token token;
+	token.content = get_current_string();
+	token.content_length = count;
+	token.type = type;
+
+	_advance(count);
+
+	return token;
 }
 
 inline bool IsNewline(CryptChar value) {
@@ -209,4 +328,12 @@ inline bool IsAlphaOrDigit(CryptChar value) {
 
 inline bool IsPrintable(CryptChar value) {
 	return value > ' ' && value < '\x7F';
+}
+
+inline bool IsIdentifierStart(CryptChar value) {
+	return IsAlpha(value) || value == '_' || value == '@';
+}
+
+inline bool IsIdentifier(CryptChar value) {
+	return IsIdentifierStart(value) || IsDigit(value);
 }
