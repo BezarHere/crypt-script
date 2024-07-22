@@ -1,0 +1,12 @@
+
+boolean_value = false
+int_value = 42
+float_value = 69.420
+array_val = { 412, 51, 65 }
+dict_val = {
+	first = 41
+	second = "i need quotes cuz im a value"
+	third = false,
+	"fourth elm" = "to" # Comment, yeah
+}
+
