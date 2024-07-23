@@ -1,6 +1,7 @@
 #include "Parser.hpp"
 #include <stdexcept>
 
+#include "Error.hpp"
 
 static CryptString PreprocessTokenStr(const CryptChar *content, size_t size);
 static Symbol ParseValue(const Token *tokens, size_t &count);
@@ -13,12 +14,23 @@ static CryptBool ParseBoolean(const CryptChar *content, size_t length);
 /// @param count in/out. in is the tokens count; out is the read count
 /// @param count in/out. in is the tokens count; out is the read count
 static errno_t ParseObject(const Token *tokens, size_t &count, Symbol &out);
+static errno_t _ParseTable(const Token *tokens, size_t &count, Symbol &out);
+static errno_t _ParseList(const Token *tokens, size_t &count, Symbol &out);
 
-static bool IsObjectAnArray(const Token *tokens, size_t count);
+static ObjectType GetObjectType(const Token *tokens, size_t count);
 static const Token *SkipUselessTokens(const Token *tokens, size_t count);
 
+static inline bool IsExpectedTokenTypeForTableKey(TokenType type);
 static inline CryptChar UnescapeChar(CryptChar value);
 static inline constexpr bool IsUselessTokenType(TokenType type);
+
+enum ObjectType
+{
+	eObjType_None,
+	eObjType_List,
+	eObjType_Table,
+};
+
 
 Symbol Symbol::Parse(const Token *tokens, size_t count) {
 	Symbol base;
@@ -204,19 +216,122 @@ CryptBool ParseBoolean(const CryptChar *content, size_t length) {
 }
 
 errno_t ParseObject(const Token *tokens, size_t &count, Symbol &out) {
+	if (tokens[0].type != TokenType::BraceOpen)
+	{
+		LOG_ERR("Expected '{' at object start %p", tokens);
+		return EINVAL;
+	}
+
+	if (count < 2)
+	{
+		LOG_ERR("too little tokens, min is 2, given is %llu", count);
+		return ERANGE;
+	}
+	
+	ObjectType obj_type = GetObjectType(tokens, count);
+
+	if (obj_type == eObjType_None)
+	{
+		LOG_ERR("object type returned as none, overwriting to table type, tokens=%p", tokens);
+		obj_type = eObjType_Table;
+	}
+
+	if (obj_type == eObjType_List)
+	{
+		return _ParseList(tokens, count, out);
+	}
+
+	return _ParseTable(tokens, count, out);
+}
+
+errno_t _ParseTable(const Token *tokens, size_t &count, Symbol &out) {
+	return errno_t();
+}
+
+errno_t _ParseList(const Token *tokens, size_t &count, Symbol &out) {
+	out.value = crypt::Variable(crypt::VariableType::List);
+
+	const size_t tokens_count = count;
+	size_t index = 1;
 	bool expecting_separator = false;
 
-
-	for (size_t i = 0; i < count; i++)
+	for (; index < count; index++)
 	{
+		// skip useless
+		index += SkipUselessTokens(&tokens[index], tokens_count - index) - &tokens[index];
+
+		const Token &token = tokens[index];
+
+		if (expecting_separator)
+		{
+			if (token.type == TokenType::Comma)
+			{
+				expecting_separator = false;
+				continue;
+			}
+
+			//! ERROR?
+			continue;
+		}
+
+
+
 	}
+
+	count = index;
 
 	return errno_t();
 }
 
-bool IsObjectAnArray(const Token *tokens, size_t count) {
+ObjectType GetObjectType(const Token *tokens, size_t count) {
+	if (tokens[0].type == TokenType::BraceOpen)
+	{
+		tokens++;
+		count--;
+	}
+	const Token *cursor = tokens;
+	size_t space_left = count;
 
-	return false;
+	cursor = SkipUselessTokens(cursor, space_left);
+	space_left = count - (cursor - tokens);
+
+	// no more tokens or we overflowed (no more tokens too)
+	if (space_left == 0 || space_left > count)
+	{
+		// it's not a list... or anything valid in-fact
+		return eObjType_None;
+	}
+
+	// ex: '{}'
+	// - this can be a list -> { {} }
+	// - this can NOT be a table -> { {} = "hello" }
+	if (!IsExpectedTokenTypeForTableKey(cursor->type))
+	{
+		return eObjType_List;
+	}
+
+	cursor++;
+	space_left--;
+
+	{
+		const Token *new_cursor = SkipUselessTokens(cursor, space_left);
+		space_left -= new_cursor - cursor;
+		cursor = new_cursor;
+	}
+
+	// assign op after a value ('name = '), must be a table; not a list
+	if (cursor->type == TokenType::AssignOp)
+	{
+		return eObjType_Table;
+	}
+
+	// comma after a value ('name ,'), can't be a table; must be a list
+	if (cursor->type == TokenType::Comma)
+	{
+		return eObjType_List;
+	}
+
+	return eObjType_None;
 }
 
 const Token *SkipUselessTokens(const Token *tokens, size_t count) {
@@ -247,6 +362,10 @@ const Token *SkipUselessTokens(const Token *tokens, size_t count) {
 	}
 
 	return &tokens[index];
+}
+
+inline bool IsExpectedTokenTypeForTableKey(TokenType type) {
+	return type == TokenType::Identifier || type == TokenType::String;
 }
 
 inline CryptChar UnescapeChar(CryptChar value) {
