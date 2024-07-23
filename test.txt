@@ -1,1 +1,19 @@
-wdawad owhdopighwaopidhp aw
+name = "agile"
+desc = "a great crypt file, used for testing"
+
+level = 31
+health = 24.96
+
+# heres a comment
+
+effects = {
+	"burden",
+	"quick",
+	42 # bug? (a number in an array?)
+}
+
+attributes = {
+	mass = 69,
+	companion = { "john", "doe" },
+	cheats = true
+}

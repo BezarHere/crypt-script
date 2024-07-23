@@ -4,11 +4,8 @@
 #include <string>
 #include <string.h>
 
-typedef char CryptChar;
-typedef std::basic_string<CryptChar> CryptString;
-
 static constexpr
-bool string_equal(const CryptChar *left, const CryptChar *right, size_t max_length = _TRUNCATE) {
+bool StringEqual(const CryptChar *left, const CryptChar *right, size_t max_length = _TRUNCATE) {
 	for (size_t i = 0; i < max_length; i++)
 	{
 		if (left[i] != right[i])
@@ -27,7 +24,7 @@ bool string_equal(const CryptChar *left, const CryptChar *right, size_t max_leng
 }
 
 static constexpr
-bool string_match(const CryptChar *substr, const CryptChar *source, size_t max_length = _TRUNCATE) {
+bool StringMatch(const CryptChar *substr, const CryptChar *source, size_t max_length = _TRUNCATE) {
 	for (size_t i = 0; i < max_length && substr[i] != 0; i++)
 	{
 		if (substr[i] != source[i])

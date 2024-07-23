@@ -5,6 +5,7 @@
 #include <iostream>
 #include <limits>
 
+
 static inline bool IsNewline(CryptChar value);
 static inline bool IsWhiteSpaceNonNewline(CryptChar value);
 static inline bool IsWhiteSpace(CryptChar value);
@@ -15,6 +16,11 @@ static inline bool IsPrintable(CryptChar value);
 
 static inline bool IsIdentifierStart(CryptChar value);
 static inline bool IsIdentifier(CryptChar value);
+
+// specializes the token to a keyword token or boolean token or ...
+static TokenType IdentifierTokenSpecialtyType(const Token &token);
+
+constexpr CryptChar StringChar = '"';
 
 class Tokenizer
 {
@@ -35,12 +41,13 @@ public:
 
 	std::vector<Token> storage;
 private:
-	void _advance(offset_t offset = 1);
+	void _advance(size_t amount = 1);
 
 	errno_t _parse_token();
 	Token _read_token();
 
 	Token _read_number();
+	Token _read_string();
 	template <typename Pred>
 	Token _read_continues(TokenType type, Pred &&predicate);
 
@@ -104,6 +111,13 @@ errno_t Tokenizer::_parse_token() {
 		return EBADF;
 	}
 
+	// debug
+	if (m_position - pre_read_pos == 0)
+	{
+		std::cout << "ERROR! at token " << pre_read_pos << "\n";
+		return EFAULT;
+	}
+
 	if (token.type == TokenType::Newline)
 	{
 		m_last_line_pos = get_read_position();
@@ -123,8 +137,6 @@ Token Tokenizer::_read_token() {
 	const CryptChar current_char = *get_current_string();
 	const size_t space_left = get_space_left();
 
-	std::cout << "current char: " << current_char << '\n';
-
 	//* whitespace and newlines
 
 	if (IsNewline(current_char))
@@ -141,6 +153,28 @@ Token Tokenizer::_read_token() {
 			TokenType::Whitespace,
 			IsWhiteSpaceNonNewline
 		);
+	}
+
+	//* strings
+
+	if (current_char == StringChar)
+	{
+		return this->_read_string();
+	}
+
+	//* numbers (floats and integers)
+
+	if (space_left > 1)
+	{
+		if (current_char == '-' && IsDigit(get_current_string()[1]))
+		{
+			return _read_number();
+		}
+	}
+
+	if (IsDigit(current_char))
+	{
+		return _read_number();
 	}
 
 	//* basic symbols
@@ -167,21 +201,6 @@ Token Tokenizer::_read_token() {
 
 			return token;
 		}
-	}
-
-	//* numbers (floats and integers)
-
-	if (space_left > 1)
-	{
-		if (current_char == '-' && IsDigit(get_current_string()[1]))
-		{
-			return _read_number();
-		}
-	}
-
-	if (IsDigit(current_char))
-	{
-		return _read_number();
 	}
 
 	//* operators
@@ -231,6 +250,9 @@ Token Tokenizer::_read_token() {
 				token.type = current_op.comp_type;
 				token.content = get_current_string();
 				token.content_length = 2;
+
+				this->_advance(2);
+
 				return token;
 			}
 		}
@@ -244,42 +266,105 @@ Token Tokenizer::_read_token() {
 		token.type = current_op.type;
 		token.content = get_current_string();
 		token.content_length = 1;
+
+		this->_advance();
+
 		return token;
 	}
 
 	if (IsIdentifierStart(current_char))
 	{
-		return _read_continues(
+		Token token = _read_continues(
 			TokenType::Identifier,
 			IsIdentifier
 		);
+
+		token.type = IdentifierTokenSpecialtyType(token);
+		return token;
 	}
 
+	// unknown token
+	this->_advance();
 	return {TokenType::Unknown, get_current_string(), 1};
 }
 
 Token Tokenizer::_read_number() {
-	return Token();
+	const CryptChar *decimal_dot = nullptr;
+	size_t index = 0;
+
+	// skip negation
+	if (get_current_string()[0] == '-')
+	{
+		index = 1;
+	}
+
+	for (; index < get_source_length(); index++)
+	{
+		const CryptChar cur_chr = get_current_string()[index];
+		if (IsDigit(cur_chr))
+		{
+			continue;
+		}
+
+		if (decimal_dot == nullptr && cur_chr == '.')
+		{
+			decimal_dot = get_current_string() + index;
+			continue;
+		}
+
+		break;
+	}
+
+	const CryptChar *current_str = get_current_string();
+
+	this->_advance(index);
+
+	return {
+		decimal_dot == nullptr ? TokenType::Integer : TokenType::Real,
+		current_str, index
+	};
+}
+
+Token Tokenizer::_read_string() {
+	size_t index = 1;
+
+	const size_t space_left = get_space_left();
+	const CryptChar *const current_str = get_current_string();
+
+	for (; index < space_left; index++)
+	{
+		// skip the escape and the char after it
+		if (current_str[index] == '\\')
+		{
+			index++;
+			continue;
+		}
+
+		if (current_str[index] == StringChar)
+		{
+			break;
+		}
+	}
+
+	this->_advance(index + 1);
+	return {
+		TokenType::String,
+		current_str + 1, index - 1
+	};
 }
 
 void Tokenizer::_add_token(const Token &token) {
 	storage.push_back(token);
 }
 
-void Tokenizer::_advance(offset_t offset) {
-	if (-offset > m_position)
-	{
-		m_position = 0;
-		return;
-	}
-
-	if (m_position + offset > m_source_length)
+void Tokenizer::_advance(size_t amount) {
+	if (m_position + amount > m_source_length)
 	{
 		m_position = m_source_length;
 		return;
 	}
 
-	m_position += offset;
+	m_position += amount;
 }
 
 template<typename Pred>
@@ -289,8 +374,6 @@ Token Tokenizer::_read_continues(TokenType type, Pred &&predicate) {
 	{
 		throw std::out_of_range("count");
 	}
-
-	std::cout << count << '\n';
 
 	Token token;
 	token.content = get_current_string();
@@ -336,4 +419,29 @@ inline bool IsIdentifierStart(CryptChar value) {
 
 inline bool IsIdentifier(CryptChar value) {
 	return IsIdentifierStart(value) || IsDigit(value);
+}
+
+TokenType IdentifierTokenSpecialtyType(const Token &token) {
+	if (StringEqual(CryptNull, token.content, token.content_length))
+	{
+		return TokenType::Null;
+	}
+
+	for (size_t i = 0; i < std::size(BooleanNames); i++)
+	{
+		if (StringEqual(BooleanNames[i], token.content, token.content_length))
+		{
+			return TokenType::Boolean;
+		}
+	}
+
+	for (size_t i = 0; i < std::size(CryptKeywords); i++)
+	{
+		if (StringEqual(CryptKeywords[i], token.content, token.content_length))
+		{
+			return TokenType::Keyword;
+		}
+	}
+
+	return token.type;
 }

@@ -1,5 +1,6 @@
 #pragma once
 #include "CryptString.hpp"
+#include "Tools.hpp"
 
 #include <vector>
 #include <inttypes.h>
@@ -13,6 +14,10 @@ enum class TokenType : uint8_t
 
 	Whitespace,
 	Newline,
+
+	Null,
+	Boolean,
+	Keyword,
 
 	String,
 	Identifier,

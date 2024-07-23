@@ -1,6 +1,7 @@
 #include "src/Tokenizer.hpp"
 #include <iostream>
 #include <fstream>
+#include <sstream>
 
 int main() {
 	const std::string file_path = "test.txt";
@@ -10,9 +11,10 @@ int main() {
 		std::cout << "ERROR: " << file_path << '\n';
 	}
 
-	std::string str{};
-	file >> str;
-	std::cout << str;
+	std::stringstream ss;
+	ss << file.rdbuf();
+
+	std::string str = ss.str();
 
 	std::vector<Token> tks{};
 	Token::Parse(str.c_str(), str.length(), tks);

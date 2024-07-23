@@ -1,0 +1,12 @@
+{
+	"C_Cpp.codeAnalysis.clangTidy.checks.disabled": [
+		"bugprone-reserved-identifier",
+		"readability-redundant-inline-specifier"
+	],
+	"files.associations": {
+		"*.json": "jsonc",
+		"*.args": "makefile",
+		"*.h": "c",
+		"stdexcept": "cpp"
+	}
+}
