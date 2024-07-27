@@ -1,4 +1,4 @@
 #pragma once
 #include <stdio.h>
 
-#define LOG_ERR(msg, ...) printf(msg, __VA_ARGS__)
+#define LOG_ERR(msg, ...) printf(msg "\n", __VA_ARGS__)

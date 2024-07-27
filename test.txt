@@ -12,8 +12,9 @@ effects = {
 	42 # bug? (a number in an array?)
 }
 
-attributes = {
-	mass = 69,
-	companion = { "john", "doe" },
-	cheats = true
-}
+# attributes = {
+# 	mass = 69,
+# 	companion = { "john", "doe" },
+# 	cheats = true,
+# 	target = null
+# }

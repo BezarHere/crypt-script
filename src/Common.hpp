@@ -23,5 +23,15 @@ static constexpr const CryptChar *BooleanNames[] = {
 };
 
 static constexpr const CryptChar *CryptKeywords[] = {
-	"func"
+	"function",
+	"and",
+	"or",
+	"not",
+	"do",
+	"then",
+	"end",
+	"if",
+	"else",
+	"elif",
+	"while"
 };

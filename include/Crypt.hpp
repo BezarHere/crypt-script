@@ -69,6 +69,11 @@ namespace crypt
 		boolean_type get_bool() const;
 		int_type get_int() const;
 		real_type get_real() const;
+
+		string_type &get_string();
+		list_type &get_list();
+		table_type &get_table();
+
 		const string_type &get_string() const;
 		const list_type &get_list() const;
 		const table_type &get_table() const;

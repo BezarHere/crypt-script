@@ -214,6 +214,33 @@ namespace crypt
 		}
 	}
 
+	string_type &Variable::get_string() {
+		if (m_type != VariableType::Str)
+		{
+			throw VariableAccessError("string");
+		}
+
+		return m_string;
+	}
+
+	list_type &Variable::get_list() {
+		if (m_type != VariableType::List)
+		{
+			throw VariableAccessError("list");
+		}
+
+		return m_list;
+	}
+
+	table_type &Variable::get_table() {
+		if (m_type != VariableType::Table)
+		{
+			throw VariableAccessError("table");
+		}
+
+		return m_table;
+	}
+
 	const string_type &Variable::get_string() const {
 		if (m_type != VariableType::Str)
 		{

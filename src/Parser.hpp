@@ -6,8 +6,8 @@ enum class SymbolType : uint8_t
 {
 	Invalid,
 
+	Identifier, // identifier name is the `name` field
 	Assign,
-
 	Value,
 };
 
