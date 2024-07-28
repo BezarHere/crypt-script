@@ -29,23 +29,23 @@ struct Block
 };
 
 static CryptString PreprocessTokenStr(const CryptChar *content, size_t size);
-static errno_t ParseValue(const Token *tokens, size_t &count, crypt::Variable &out);
+static ParseResult ParseValue(const Token *tokens, size_t count, crypt::Variable &out);
 
 static CryptInt ParseInt(const CryptChar *content, size_t length);
 static CryptReal ParseReal(const CryptChar *content, size_t length);
 static CryptBool ParseBoolean(const CryptChar *content, size_t length);
 
 static ParseResult ParseExpression(const TokenReadout &tokens, Symbol &out);
-static errno_t ParseBlock(const TokenReadout &tokens, size_t &read_count, const Block &block);
+static ParseResult ParseBlock(const TokenReadout &tokens, const Block &block);
 
 static ParseResult _ParseIdentifierExpr(const TokenReadout &tokens, Symbol &out);
 
 /// @param tokens start of the object (the '{' token)
 /// @param count in/out. in is the tokens count; out is the read count
 /// @param count in/out. in is the tokens count; out is the read count
-static errno_t ParseObject(const Token *tokens, size_t &count, crypt::Variable &out);
-static errno_t _ParseTable(const Token *tokens, size_t &count, CryptTable &out);
-static errno_t _ParseList(const Token *tokens, size_t &count, CryptList &out);
+static ParseResult ParseObject(const Token *tokens, size_t count, crypt::Variable &out);
+static ParseResult _ParseTable(const Token *tokens, size_t count, CryptTable &out);
+static ParseResult _ParseList(const Token *tokens, size_t count, CryptList &out);
 
 static ObjectType GetObjectType(const Token *tokens, size_t count);
 static const Token *SkipUselessTokens(const Token *tokens, size_t count);
@@ -94,11 +94,14 @@ CryptString PreprocessTokenStr(const CryptChar *content, const size_t size) {
 	return result;
 }
 
-errno_t ParseValue(const Token *tokens, size_t &count, crypt::Variable &out) {
+ParseResult ParseValue(const Token *tokens, size_t count, crypt::Variable &out) {
 	const Token &head = tokens[0];
 
 	const size_t tokens_count = count;
 	count = 1;
+
+	ParseResult result;
+
 
 	switch (head.type)
 	{
@@ -287,6 +290,7 @@ errno_t ParseBlock(const TokenReadout &tokens, size_t &read_count, const Block &
 
 		Symbol output = {};
 		ParseResult result = ParseExpression({&tokens.tokens[index], tokens.count - index}, output);
+		block.parent.children.push_back(output);
 
 		if (result.error != EOK)
 		{

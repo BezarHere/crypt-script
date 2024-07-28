@@ -17,7 +17,13 @@ enum class TokenType : uint8_t
 
 	Null,
 	Boolean,
-	Keyword,
+
+	KW_Function,
+	KW_If,
+	KW_Elif,
+	KW_Else,
+	KW_BlockBegin,
+	KW_BlockEnd,
 
 	String,
 	Identifier,

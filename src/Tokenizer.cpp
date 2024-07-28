@@ -17,6 +17,28 @@ static inline bool IsPrintable(CryptChar value);
 static inline bool IsIdentifierStart(CryptChar value);
 static inline bool IsIdentifier(CryptChar value);
 
+struct KeywordName
+{
+	const TokenType type;
+	const CryptChar *name;
+};
+
+static constexpr KeywordName CryptKeywords[] = {
+	{ TokenType::KW_Function, "function" },
+
+	{ TokenType::KW_If, "if" },
+	{ TokenType::KW_Elif, "elif" },
+	{ TokenType::KW_Else, "else" },
+
+	{ TokenType::KW_BlockBegin, "do" },
+	{ TokenType::KW_BlockBegin, "then" },
+	{ TokenType::KW_BlockEnd, "end" },
+
+	{ TokenType::AndOp, "and" },
+	{ TokenType::OrOp, "or" },
+	{ TokenType::NotOp, "not" },
+};
+
 // specializes the token to a keyword token or boolean token or ...
 static TokenType IdentifierTokenSpecialtyType(const Token &token);
 
@@ -437,9 +459,9 @@ TokenType IdentifierTokenSpecialtyType(const Token &token) {
 
 	for (size_t i = 0; i < std::size(CryptKeywords); i++)
 	{
-		if (StringEqual(CryptKeywords[i], token.content, token.content_length))
+		if (StringEqual(CryptKeywords[i].name, token.content, token.content_length))
 		{
-			return TokenType::Keyword;
+			return CryptKeywords[i].type;
 		}
 	}
 
